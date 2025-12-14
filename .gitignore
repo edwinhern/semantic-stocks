@@ -1,2 +1,6 @@
 # Custom
-.cursor/notes/*
+.vscode/notes/*
+
+# Environment variables
+.env*
+!.env.template

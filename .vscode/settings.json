@@ -1,0 +1,12 @@
+{
+    "files.exclude": {
+        "**/.mypy_cache": true,
+        "**/.ruff_cache": true,
+        "**/__pycache__": true,
+        "**/.DS_Store": true,
+    },
+    "conventionalCommits.scopes": [
+        "backend",
+        "frontend"
+    ]
+}

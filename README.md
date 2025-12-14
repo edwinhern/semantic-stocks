@@ -1,1 +1,1 @@
-# swing-bot
+# swingbot

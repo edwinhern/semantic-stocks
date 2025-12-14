@@ -1,0 +1,55 @@
+services:
+  redis:
+    image: redis:8.0-alpine
+    container_name: swingbot-redis
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS__PASSWORD}
+    restart: unless-stopped
+    ports:
+      - "${REDIS__PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  postgres:
+    image: postgres:16-alpine
+    container_name: swingbot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE__USER}
+      POSTGRES_PASSWORD: ${DATABASE__PASSWORD}
+      POSTGRES_DB: ${DATABASE__DATABASE}
+    ports:
+      - "${DATABASE__PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE__USER} -d ${DATABASE__DATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  flyway:
+    image: flyway/flyway:11-alpine
+    container_name: swingbot-flyway
+    command: migrate
+    environment:
+      POSTGRES_USER: ${DATABASE__USER}
+      POSTGRES_PASSWORD: ${DATABASE__PASSWORD}
+      POSTGRES_DB: ${DATABASE__DATABASE}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+    volumes:
+      - ./database/flyway.conf:/flyway/conf/flyway.conf
+      - ./database/migrations:/flyway/sql
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
