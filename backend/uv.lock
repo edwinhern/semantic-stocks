@@ -445,6 +445,20 @@ wheels = [
 ]
 
 [[package]]
+name = "massive"
+version = "2.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "urllib3" },
+    { name = "websockets" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/89/60/5a387e96e834b662b4dde53c061e15cf060a6c3a32553fda679e435bfcbc/massive-2.0.2.tar.gz", hash = "sha256:1d64b7fcf20678cc231cfd2cd5365e4e9f16cc3ee617fa056344987e5adcc1e4", size = 44798, upload-time = "2025-11-19T15:36:30.799Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/42/21/7f50902ef5e19e22628d225428599fdb7819756bf8720f94d39327f760cd/massive-2.0.2-py3-none-any.whl", hash = "sha256:6c6dd3d628dd68f036f49640426976aa6495904c68ee0fa01b4024ff9d900ddd", size = 62611, upload-time = "2025-11-19T15:36:29.689Z" },
+]
+
+[[package]]
 name = "mdurl"
 version = "0.1.2"
 source = { registry = "https://pypi.org/simple" }
@@ -830,11 +844,12 @@ wheels = [
 ]
 
 [[package]]
-name = "swing-bot-api"
+name = "swingbot-api"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
+    { name = "massive" },
 ]
 
 [package.dev-dependencies]
@@ -846,7 +861,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "fastapi", extras = ["standard"], specifier = ">=0.124.4" }]
+requires-dist = [
+    { name = "fastapi", extras = ["standard"], specifier = ">=0.124.4" },
+    { name = "massive", specifier = ">=2.0.2" },
+]
 
 [package.metadata.requires-dev]
 dev = [

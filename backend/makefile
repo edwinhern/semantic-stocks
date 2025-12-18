@@ -14,7 +14,7 @@ install: ## Install Python dependencies
 	uv sync
 
 dev: ## Run bot locally (not in Docker)
-	uv run fastapi dev 
+	uv run fastapi dev app/main.py 
 
 format: ## Format code
 	uv run ruff format .
@@ -23,4 +23,4 @@ lint: ## Lint code
 	uv run ruff check . --fix
 
 typecheck: ## Type check code
-	uv run mypy app
+	uv run mypy .

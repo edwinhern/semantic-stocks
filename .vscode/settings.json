@@ -3,10 +3,15 @@
         "**/.mypy_cache": true,
         "**/.ruff_cache": true,
         "**/__pycache__": true,
-        "**/.DS_Store": true,
+        "**/.DS_Store": true
     },
     "conventionalCommits.scopes": [
         "backend",
-        "frontend"
+        "frontend",
+        "infra"
+    ],
+    "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
+    "mypy-type-checker.args": [
+        "--config-file=${workspaceFolder}/backend/pyproject.toml"
     ]
 }

@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi[standard]>=0.124.4",
+    "massive>=2.0.2",
 ]
 
 [dependency-groups]
@@ -18,8 +19,8 @@ dev = [
 
 [tool.mypy]
 plugins = ['pydantic.mypy']
-files = ["src"]
-mypy_path = ["src"]
+files = ["app"]
+mypy_path = ["app"]
 explicit_package_bases = true
 disallow_untyped_defs = true
 disallow_any_unimported = true
@@ -33,6 +34,14 @@ show_error_codes = true
 target-version = "py39"
 line-length = 120
 fix = true
+
+[[tool.mypy.overrides]]
+module = "massive"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "massive.*"
+ignore_missing_imports = true
 
 [tool.ruff.lint]
 select = [

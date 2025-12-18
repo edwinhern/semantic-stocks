@@ -9,7 +9,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping"]
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS__PASSWORD} ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,11 +36,11 @@ services:
     container_name: swingbot-flyway
     command: migrate
     environment:
-      POSTGRES_USER: ${DATABASE__USER}
-      POSTGRES_PASSWORD: ${DATABASE__PASSWORD}
-      POSTGRES_DB: ${DATABASE__DATABASE}
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
+      DATABASE__USER: ${DATABASE__USER}
+      DATABASE__PASSWORD: ${DATABASE__PASSWORD}
+      DATABASE__DATABASE: ${DATABASE__DATABASE}
+      DATABASE__HOST: postgres
+      DATABASE__PORT: 5432
     volumes:
       - ./database/flyway.conf:/flyway/conf/flyway.conf
       - ./database/migrations:/flyway/sql
