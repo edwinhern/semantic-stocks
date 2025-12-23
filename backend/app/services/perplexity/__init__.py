@@ -1,6 +1,6 @@
 """Perplexity AI service for stock research and sentiment analysis."""
 
-from .client import PerplexityClient, PerplexityModel, get_perplexity_client
+from .client import PerplexityClient, PerplexityModel, SearchRecency, get_perplexity_client
 from .models import (
     DeepResearchResult,
     FinalRecommendation,
@@ -16,6 +16,7 @@ __all__ = [
     "PerplexityModel",
     "PromptTemplates",
     "QuickSentimentScan",
+    "SearchRecency",
     "StockCandidate",
     "get_perplexity_client",
 ]

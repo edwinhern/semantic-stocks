@@ -218,7 +218,7 @@ async def analyze_single(ticker: str, full_pipeline: bool = False) -> None:
         with console.status("[bold]Stage 3: Deep Research (analyzing news & sentiment)..."):
             deep_research = await pipeline.run_deep_research(ticker, company_name, analysis)
 
-        console.print("\n[bold]Stage 3: Deep Research[/] (Perplexity sonar-pro)")
+        console.print("\n[bold]Stage 3: Deep Research[/] (Perplexity sonar-deep-research)")
         console.print(f"  Decline Type: {deep_research.decline_type}")
         console.print(f"  Reason: {deep_research.decline_reason[:100]}...")
         console.print(f"  Twitter: {deep_research.twitter_sentiment} | Reddit: {deep_research.reddit_sentiment}")

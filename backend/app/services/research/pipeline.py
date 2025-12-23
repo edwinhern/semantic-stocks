@@ -8,6 +8,7 @@ Implements the "Polygon First, Perplexity Smart" strategy:
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import ClassVar
 
 from ..perplexity import PerplexityClient, get_perplexity_client
 from ..perplexity.models import DeepResearchResult, FinalRecommendation, PipelineResult, QuickSentimentScan
@@ -32,11 +33,13 @@ class ResearchPipeline:
     """Orchestrates the multi-stage stock research pipeline.
 
     Flow:
-    Stage 0: Discovery (Polygon) - Find stocks near 52-week lows
-    Stage 1: Technical Screening (Polygon) - Compute technical score
-    Stage 2: Quick Scan (Perplexity sonar) - Check for critical issues
-    Stage 3: Deep Research (Perplexity sonar-pro) - Comprehensive analysis
-    Stage 4: Final Scoring (Perplexity sonar-reasoning) - Generate recommendation
+    Stage 0: Discovery (Polygon) - Find stocks near 52-week lows [FREE]
+    Stage 1: Technical Screening (Polygon) - Compute technical score [FREE]
+    Stage 2: Quick Scan (Perplexity sonar) - Check for critical issues [~$0.001]
+    Stage 3: Deep Research (Perplexity sonar-deep-research) - Exhaustive analysis with citations [~$0.03]
+    Stage 4: Final Scoring (Perplexity sonar-reasoning) - Generate recommendation [~$0.01]
+
+    Total estimated cost per stock: ~$0.04
     """
 
     def __init__(
@@ -145,10 +148,11 @@ class ResearchPipeline:
         scan_result = await self._perplexity.achat_structured(
             prompt=prompt,
             response_model=QuickSentimentScan,
-            model="sonar",  # Cheapest model
+            model="sonar",  # Cheapest model for quick checks
             system_message=self._prompts.QUICK_SCAN_SYSTEM,
             temperature=0.1,
             max_tokens=512,
+            search_recency_filter="week",  # Focus on recent news
         )
 
         # Check gate
@@ -164,8 +168,20 @@ class ResearchPipeline:
         return scan_result, gate_result
 
     # =========================================================================
-    # Stage 3: Deep Research (TARGETED - Perplexity sonar-pro)
+    # Stage 3: Deep Research (TARGETED - Perplexity sonar-deep-research)
     # =========================================================================
+
+    # Target domains for financial research
+    RESEARCH_DOMAINS: ClassVar[list[str]] = [
+        "twitter.com",
+        "x.com",
+        "reddit.com",
+        "finance.yahoo.com",
+        "seekingalpha.com",
+        "reuters.com",
+        "bloomberg.com",
+        "cnbc.com",
+    ]
 
     async def run_deep_research(
         self,
@@ -175,8 +191,11 @@ class ResearchPipeline:
     ) -> DeepResearchResult:
         """Run Stage 3: Deep Research.
 
-        This uses Perplexity's sonar-pro model for comprehensive analysis,
-        with technical context from Polygon injected into the prompt.
+        This uses Perplexity's sonar-deep-research model for exhaustive research
+        with quality citations. Technical context from Polygon is injected into the prompt.
+
+        The sonar-deep-research model uses <think>...</think> tags for reasoning,
+        which our client handles automatically before parsing the JSON output.
 
         Args:
             ticker: Stock ticker symbol
@@ -184,7 +203,7 @@ class ResearchPipeline:
             technical_analysis: Technical analysis from Stage 1
 
         Returns:
-            DeepResearchResult with comprehensive analysis
+            DeepResearchResult with comprehensive analysis and citations
         """
         prompt = self._prompts.format_deep_research(
             ticker=ticker,
@@ -204,10 +223,13 @@ class ResearchPipeline:
         return await self._perplexity.achat_structured(
             prompt=prompt,
             response_model=DeepResearchResult,
-            model="sonar-pro",  # Complex research model
+            model="sonar-deep-research",  # Exhaustive research with citations
             system_message=self._prompts.DEEP_RESEARCH_SYSTEM,
             temperature=0.2,
-            max_tokens=2048,
+            max_tokens=8192,  # Higher limit for deep research + thinking
+            search_recency_filter="month",  # Look at past month of news
+            search_domain_filter=self.RESEARCH_DOMAINS,  # Target credible sources
+            search_context_size="high",  # Maximum context for thorough research
         )
 
     # =========================================================================
@@ -251,10 +273,11 @@ class ResearchPipeline:
         return await self._perplexity.achat_structured(
             prompt=prompt,
             response_model=FinalRecommendation,
-            model="sonar-reasoning",  # Reasoning model for synthesis
+            model="sonar-reasoning-pro",  # Reasoning model for synthesis
             system_message=self._prompts.SCORING_SYSTEM,
             temperature=0.1,
-            max_tokens=2048,
+            max_tokens=8192,  # Reasoning models need more tokens for <think> + JSON output
+            disable_search=True,  # No search needed - synthesis only
         )
 
     # =========================================================================
@@ -294,7 +317,7 @@ class ResearchPipeline:
             # Return early - stock didn't pass technical gates
             return None
 
-        # Stage 2: Quick Scan (CHEAP - ~$0.001)
+        # Stage 2: Quick Scan (sonar - ~$0.001)
         quick_scan, scan_gate = await self.run_quick_scan(ticker, company_name)
         stages_completed.append("quick_scan")
         total_cost += 0.001
@@ -303,12 +326,12 @@ class ResearchPipeline:
             # Return early - critical issues found
             return None
 
-        # Stage 3: Deep Research (TARGETED - ~$0.02)
+        # Stage 3: Deep Research (sonar-deep-research - ~$0.03)
         deep_research = await self.run_deep_research(ticker, company_name, technical_analysis)
         stages_completed.append("deep_research")
-        total_cost += 0.02
+        total_cost += 0.03
 
-        # Stage 4: Final Scoring (~$0.01)
+        # Stage 4: Final Scoring (sonar-reasoning - ~$0.01)
         recommendation = await self.run_final_scoring(ticker, company_name, technical_analysis, deep_research)
         stages_completed.append("final_scoring")
         total_cost += 0.01

@@ -10,12 +10,14 @@ help: ## Show this help message
 	@echo 'Available targets:'
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-install: ## Install Python dependencies
+sync: ## Sync Python dependencies
 	uv sync
 
 dev: ## Run bot locally (not in Docker)
 	uv run fastapi dev app/main.py 
 
+cli: ## Run CLI
+	uv run python -m app.main --scan
 
 format: ## Format code
 	uv run ruff format .

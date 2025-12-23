@@ -9,12 +9,14 @@ from pydantic import BaseModel
 
 # Type-safe model selection
 PerplexityModel = Literal[
-    "sonar",  # Quick queries, cheapest - use for Stage 2
-    "sonar-pro",  # Complex research - use for Stage 3
-    "sonar-reasoning",  # Problem-solving and scoring - use for Stage 4
-    "sonar-reasoning-pro",  # Advanced reasoning
-    "sonar-deep-research",  # Exhaustive research (100 RPM limit)
+    "sonar",  # Quick queries, cheapest ($1/$1 per 1M) - use for Stage 2
+    "sonar-pro",  # Advanced search ($3/$15 per 1M) - complex queries
+    "sonar-reasoning-pro",  # Enhanced reasoning ($2/$8 per 1M) - use for Stage 4
+    "sonar-deep-research",  # Exhaustive research with citations ($2/$8 per 1M + $2/1M citations)
 ]
+
+# Search recency filter options
+SearchRecency = Literal["hour", "day", "week", "month", "year"]
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -49,7 +51,71 @@ class PerplexityClient:
             JSON schema dict compatible with Perplexity API
         """
         schema = model_class.model_json_schema()
-        return {"type": "json_schema", "json_schema": {"schema": schema}}
+        return {
+            "type": "json_schema",
+            "json_schema": {
+                "schema": schema,
+                "name": model_class.__name__,
+                "strict": True,
+            },
+        }
+
+    def _extract_json_from_response(self, content: str, model: str) -> str:
+        """Extract JSON from response, handling <think> tags from reasoning models.
+
+        Based on Perplexity's official documentation:
+        https://docs.perplexity.ai/guides/structured-outputs
+
+        The sonar-reasoning-pro and sonar-deep-research models output a <think>
+        section containing reasoning tokens, immediately followed by valid JSON.
+        The response_format parameter does NOT remove these reasoning tokens.
+
+        Args:
+            content: Raw response content from Perplexity
+            model: Model name for error messages
+
+        Returns:
+            JSON string extracted from the response
+
+        Raises:
+            ValueError: If no valid JSON can be extracted
+        """
+        # Check if response contains <think> tags (reasoning models)
+        if "<think>" in content:
+            # Find the closing </think> tag using rfind (last occurrence)
+            marker = "</think>"
+            idx = content.rfind(marker)
+
+            if idx == -1:
+                # <think> tag opened but not closed - response was truncated
+                raise ValueError(
+                    f"Model '{model}' response was truncated during thinking phase. "
+                    f"Try increasing max_tokens. "
+                    f"Response preview: {content[:300]}..."
+                )
+
+            # Extract the substring after the marker
+            json_str = content[idx + len(marker) :].strip()
+
+            if not json_str:
+                raise ValueError(
+                    f"Model '{model}' returned thinking process but no JSON output. "
+                    f"The response may have been truncated. "
+                    f"Thinking preview: {content[:300]}..."
+                )
+
+            # Remove markdown code fence markers if present (per Perplexity docs)
+            if json_str.startswith("```json"):
+                json_str = json_str[len("```json") :].strip()
+            if json_str.startswith("```"):
+                json_str = json_str[3:].strip()
+            if json_str.endswith("```"):
+                json_str = json_str[:-3].strip()
+
+            return json_str
+
+        # No think tags - return content as-is
+        return content.strip()
 
     def chat(
         self,
@@ -129,6 +195,10 @@ class PerplexityClient:
         system_message: str | None = None,
         temperature: float = 0.1,
         max_tokens: int = 2048,
+        search_recency_filter: SearchRecency | None = None,
+        search_domain_filter: list[str] | None = None,
+        search_context_size: Literal["low", "medium", "high"] | None = None,
+        disable_search: bool = False,
     ) -> T:
         """Send a chat request with structured JSON output (synchronous).
 
@@ -139,6 +209,10 @@ class PerplexityClient:
             system_message: Optional system message for context
             temperature: Sampling temperature (lower for structured output)
             max_tokens: Maximum tokens in response
+            search_recency_filter: Limit results to recent content (hour/day/week/month/year)
+            search_domain_filter: Limit search to specific domains (e.g., ["twitter.com", "reddit.com"])
+            search_context_size: Control search depth (low/medium/high)
+            disable_search: If True, skip web search (for synthesis-only tasks)
 
         Returns:
             Parsed Pydantic model instance
@@ -150,16 +224,51 @@ class PerplexityClient:
 
         response_format = self._build_json_schema(response_model)
 
-        response = self._sync_client.chat.completions.create(  # type: ignore[call-overload]
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format=response_format,
-        )
+        # Build optional parameters
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "response_format": response_format,
+        }
 
-        content = response.choices[0].message.content or "{}"
-        data = json.loads(content)
+        if search_recency_filter:
+            kwargs["search_recency_filter"] = search_recency_filter
+
+        if search_domain_filter:
+            kwargs["search_domain_filter"] = search_domain_filter
+
+        if search_context_size:
+            kwargs["web_search_options"] = {"search_context_size": search_context_size}
+
+        if disable_search:
+            kwargs["disable_search"] = True
+
+        response = self._sync_client.chat.completions.create(**kwargs)
+
+        raw_content = response.choices[0].message.content or ""
+
+        # Handle empty response
+        if not raw_content.strip():
+            raise ValueError(
+                f"Empty response from Perplexity model '{model}'. The model may not support structured output."
+            )
+
+        # Extract JSON from response (handles <think> tags from reasoning models)
+        json_content = self._extract_json_from_response(raw_content, model)
+
+        # Try to parse JSON, with helpful error message
+        try:
+            data = json.loads(json_content)
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                f"Failed to parse JSON from Perplexity response. "
+                f"Model: {model}, Error: {e}. "
+                f"Extracted content: {json_content[:500]}... "
+                f"Raw response preview: {raw_content[:300]}..."
+            ) from e
+
         return response_model.model_validate(data)
 
     async def achat_structured(
@@ -170,6 +279,10 @@ class PerplexityClient:
         system_message: str | None = None,
         temperature: float = 0.1,
         max_tokens: int = 2048,
+        search_recency_filter: SearchRecency | None = None,
+        search_domain_filter: list[str] | None = None,
+        search_context_size: Literal["low", "medium", "high"] | None = None,
+        disable_search: bool = False,
     ) -> T:
         """Send a chat request with structured JSON output (asynchronous).
 
@@ -180,6 +293,10 @@ class PerplexityClient:
             system_message: Optional system message for context
             temperature: Sampling temperature (lower for structured output)
             max_tokens: Maximum tokens in response
+            search_recency_filter: Limit results to recent content (hour/day/week/month/year)
+            search_domain_filter: Limit search to specific domains (e.g., ["twitter.com", "reddit.com"])
+            search_context_size: Control search depth (low/medium/high)
+            disable_search: If True, skip web search (for synthesis-only tasks)
 
         Returns:
             Parsed Pydantic model instance
@@ -191,16 +308,49 @@ class PerplexityClient:
 
         response_format = self._build_json_schema(response_model)
 
-        response = await self._async_client.chat.completions.create(  # type: ignore[call-overload]
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format=response_format,
-        )
+        # Build optional parameters
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "response_format": response_format,
+        }
 
-        content = response.choices[0].message.content or "{}"
-        data = json.loads(content)
+        if search_recency_filter:
+            kwargs["search_recency_filter"] = search_recency_filter
+
+        if search_domain_filter:
+            kwargs["search_domain_filter"] = search_domain_filter
+
+        if search_context_size:
+            kwargs["web_search_options"] = {"search_context_size": search_context_size}
+
+        if disable_search:
+            kwargs["disable_search"] = True
+
+        response = await self._async_client.chat.completions.create(**kwargs)
+
+        raw_content = response.choices[0].message.content or ""
+
+        # Handle empty response
+        if not raw_content.strip():
+            raise ValueError(
+                f"Empty response from Perplexity model '{model}'. The model may not support structured output."
+            )
+
+        # Extract JSON from response (handles <think> tags from reasoning models)
+        json_content = self._extract_json_from_response(raw_content, model)
+
+        try:
+            data = json.loads(json_content)
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                f"Failed to parse JSON from Perplexity response. "
+                f"Model: {model}, Error: {e}. "
+                f"Response preview: {json_content[:500]}..."
+            ) from e
+
         return response_model.model_validate(data)
 
 

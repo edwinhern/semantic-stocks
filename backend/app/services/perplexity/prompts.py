@@ -21,16 +21,23 @@ Be concise and accurate. Only flag genuine critical issues, not normal market vo
     QUICK_SCAN_PROMPT = """Perform a quick risk assessment for {ticker} ({company_name}).
 
 Check for any of these CRITICAL issues:
-1. Bankruptcy risk or severe financial distress
-2. Fraud investigations or SEC enforcement actions
-3. Major lawsuits with material financial impact
-4. Executive scandals (CEO/CFO resignation under investigation)
-5. Product failures or recalls with significant liability
-6. Delisting warnings or going concern notices
+1. **STOCK NO LONGER TRADING**: Has the stock been acquired, merged, or delisted?
+   - Check if there was a recent acquisition (e.g., by private equity, another company)
+   - Check if the stock has been delisted from the exchange
+   - Check if a merger has completed and the ticker no longer trades
+2. Bankruptcy risk or severe financial distress
+3. Fraud investigations or SEC enforcement actions
+4. Major lawsuits with material financial impact
+5. Executive scandals (CEO/CFO resignation under investigation)
+6. Product failures or recalls with significant liability
+7. Delisting warnings or going concern notices
+
+IMPORTANT: If the stock has been ACQUIRED, MERGED, or DELISTED in the past 6 months,
+this is a CRITICAL issue of type "structural" with has_critical_issues=true.
 
 If issues are found, classify as:
 - "temporary": Earnings miss, supply chain issues, one-time events
-- "structural": Fundamental business problems, loss of competitive position, sustained decline
+- "structural": Stock delisted, acquired, merged, fundamental business problems, loss of competitive position
 
 Respond with ONLY the structured JSON matching the schema. No explanation text."""
 
