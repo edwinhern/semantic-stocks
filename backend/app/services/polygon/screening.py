@@ -54,6 +54,48 @@ class TechnicalAnalysis(BaseModel):
     sma_interpretation: str = Field(description="Human-readable SMA interpretation")
 
 
+def _compute_rsi_score(rsi: float) -> int:
+    """Compute RSI score component (0-30 points)."""
+    if 25 <= rsi <= 35:
+        return 30  # Oversold, ideal entry zone
+    if 35 < rsi <= 50:
+        return 20  # Recovering from oversold
+    if 50 < rsi <= 60:
+        return 10  # Neutral
+    return 0  # RSI < 25 (freefall) or > 60 (losing momentum)
+
+
+def _compute_sma_score(price: float, sma_20: float, sma_50: float) -> int:
+    """Compute SMA position score component (0-25 points)."""
+    if price > sma_20 > sma_50:
+        return 25  # Full bullish alignment
+    if price > sma_20:
+        return 15  # Above short-term trend
+    if sma_20 > sma_50:
+        return 10  # Golden cross forming
+    return 0
+
+
+def _compute_low_proximity_score(percent_from_low: float) -> int:
+    """Compute 52-week low proximity score component (0-25 points)."""
+    if 5 <= percent_from_low <= 10:
+        return 25  # Ideal zone - bounced, room to grow
+    if 10 < percent_from_low <= 15:
+        return 20  # Still good entry
+    if 15 < percent_from_low <= 20:
+        return 10  # Moderate opportunity
+    return 0  # < 5% (still falling) or > 20% (already recovered)
+
+
+def _compute_volume_score(recent_volume: int, avg_volume: int) -> int:
+    """Compute volume score component (0-20 points)."""
+    if recent_volume > avg_volume * 1.2:
+        return 20  # Strong accumulation signal
+    if recent_volume >= avg_volume:
+        return 10  # Normal/healthy volume
+    return 0
+
+
 def compute_technical_score(data: TechnicalData) -> int:
     """Compute a technical score based on mean reversion + momentum strategy.
 
@@ -70,45 +112,59 @@ def compute_technical_score(data: TechnicalData) -> int:
         Technical score from 0-100
     """
     score = 0
-
-    # RSI Score (0-30 points)
-    # Favor oversold but recovering conditions
-    if 25 <= data.rsi <= 35:
-        score += 30  # Oversold, ideal entry zone
-    elif 35 < data.rsi <= 50:
-        score += 20  # Recovering from oversold
-    elif 50 < data.rsi <= 60:
-        score += 10  # Neutral
-    # RSI < 25 (freefall) or > 60 (losing momentum) = 0 points
-
-    # SMA Position (0-25 points)
-    # Favor bullish alignment and golden cross formations
-    if data.price > data.sma_20 > data.sma_50:
-        score += 25  # Full bullish alignment
-    elif data.price > data.sma_20:
-        score += 15  # Above short-term trend
-    elif data.sma_20 > data.sma_50:
-        score += 10  # Golden cross forming
-
-    # 52-Week Low Proximity (0-25 points)
-    # Sweet spot is 5-15% above the low (bounced but still undervalued)
-    pct = data.percent_from_low
-    if 5 <= pct <= 10:
-        score += 25  # Ideal zone - bounced, room to grow
-    elif 10 < pct <= 15:
-        score += 20  # Still good entry
-    elif 15 < pct <= 20:
-        score += 10  # Moderate opportunity
-    # < 5% (still falling) or > 20% (already recovered) = 0 points
-
-    # Volume (0-20 points)
-    # Look for accumulation signals (higher than average volume)
-    if data.recent_volume > data.avg_volume * 1.2:
-        score += 20  # Strong accumulation signal
-    elif data.recent_volume >= data.avg_volume:
-        score += 10  # Normal/healthy volume
-
+    score += _compute_rsi_score(data.rsi)
+    score += _compute_sma_score(data.price, data.sma_20, data.sma_50)
+    score += _compute_low_proximity_score(data.percent_from_low)
+    score += _compute_volume_score(data.recent_volume, data.avg_volume)
     return min(score, 100)  # Cap at 100
+
+
+def _get_rsi_signals(rsi: float) -> list[str]:
+    """Extract RSI-based signals."""
+    signals: list[str] = []
+    rsi_signal = get_rsi_signal(rsi)
+    if rsi_signal in ("oversold", "extremely_oversold"):
+        signals.append("oversold")
+    elif rsi_signal == "recovering":
+        signals.append("recovering_momentum")
+    elif rsi_signal in ("overbought", "overbought_warning"):
+        signals.append("overbought_warning")
+    return signals
+
+
+def _get_sma_signals(price: float, sma_20: float, sma_50: float) -> list[str]:
+    """Extract SMA-based signals."""
+    signals: list[str] = []
+    sma_signal = get_price_vs_sma_signal(price, sma_20, sma_50)
+    if sma_signal == "bullish_alignment":
+        signals.append("bullish_trend")
+    elif sma_signal == "above_sma20":
+        signals.append("above_sma20")
+    elif sma_signal == "golden_cross_forming":
+        signals.append("golden_cross_forming")
+    elif sma_signal == "bearish_alignment":
+        signals.append("bearish_trend")
+    return signals
+
+
+def _get_low_proximity_signals(percent_from_low: float) -> list[str]:
+    """Extract 52-week low proximity signals."""
+    signals: list[str] = []
+    if 5 <= percent_from_low <= 15:
+        signals.append("near_52_week_low")
+    elif percent_from_low < 5:
+        signals.append("at_52_week_low")
+    return signals
+
+
+def _get_volume_signals(recent_volume: int, avg_volume: int) -> list[str]:
+    """Extract volume-based signals."""
+    signals: list[str] = []
+    if recent_volume > avg_volume * 1.2:
+        signals.append("volume_spike")
+    elif recent_volume < avg_volume * 0.5:
+        signals.append("low_volume")
+    return signals
 
 
 def get_technical_signals(data: TechnicalData) -> list[str]:
@@ -121,39 +177,10 @@ def get_technical_signals(data: TechnicalData) -> list[str]:
         List of signal strings
     """
     signals: list[str] = []
-
-    # RSI signals
-    rsi_signal = get_rsi_signal(data.rsi)
-    if rsi_signal in ("oversold", "extremely_oversold"):
-        signals.append("oversold")
-    elif rsi_signal == "recovering":
-        signals.append("recovering_momentum")
-    elif rsi_signal in ("overbought", "overbought_warning"):
-        signals.append("overbought_warning")
-
-    # SMA signals
-    sma_signal = get_price_vs_sma_signal(data.price, data.sma_20, data.sma_50)
-    if sma_signal == "bullish_alignment":
-        signals.append("bullish_trend")
-    elif sma_signal == "above_sma20":
-        signals.append("above_sma20")
-    elif sma_signal == "golden_cross_forming":
-        signals.append("golden_cross_forming")
-    elif sma_signal == "bearish_alignment":
-        signals.append("bearish_trend")
-
-    # 52-week low signals
-    if 5 <= data.percent_from_low <= 15:
-        signals.append("near_52_week_low")
-    elif data.percent_from_low < 5:
-        signals.append("at_52_week_low")
-
-    # Volume signals
-    if data.recent_volume > data.avg_volume * 1.2:
-        signals.append("volume_spike")
-    elif data.recent_volume < data.avg_volume * 0.5:
-        signals.append("low_volume")
-
+    signals.extend(_get_rsi_signals(data.rsi))
+    signals.extend(_get_sma_signals(data.price, data.sma_20, data.sma_50))
+    signals.extend(_get_low_proximity_signals(data.percent_from_low))
+    signals.extend(_get_volume_signals(data.recent_volume, data.avg_volume))
     return signals
 
 

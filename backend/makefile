@@ -16,8 +16,6 @@ install: ## Install Python dependencies
 dev: ## Run bot locally (not in Docker)
 	uv run fastapi dev app/main.py 
 
-example: ## Run example script
-	uv run python scripts/massive-ex.py
 
 format: ## Format code
 	uv run ruff format .
@@ -26,4 +24,4 @@ lint: ## Lint code
 	uv run ruff check . --fix
 
 typecheck: ## Type check code
-	uv run mypy .
+	uv run --group dev python -m mypy app

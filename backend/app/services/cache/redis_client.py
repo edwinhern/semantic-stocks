@@ -66,7 +66,7 @@ class RedisCache:
 
     def _make_key(self, prefix: str, key: str) -> str:
         """Create a namespaced cache key."""
-        return f"swingbot:{prefix}:{key}"
+        return f"semantic-stocks:{prefix}:{key}"
 
     # =========================================================================
     # S&P 500 List Cache
@@ -210,7 +210,7 @@ class RedisCache:
 
     def invalidate_all(self) -> int:
         """Invalidate all cached data (use with caution)."""
-        pattern = "swingbot:*"
+        pattern = "semantic-stocks:*"
         keys = list(self._client.scan_iter(match=pattern))
         if keys:
             return self._client.delete(*keys)

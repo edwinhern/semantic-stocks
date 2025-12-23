@@ -38,7 +38,7 @@ class DatabaseService:
         self._port = port or int(os.getenv("DATABASE__PORT", "5432"))
         self._user = user or os.getenv("DATABASE__USER", "admin")
         self._password = password or os.getenv("DATABASE__PASSWORD", "")
-        self._database = database or os.getenv("DATABASE__DATABASE", "swingbot_db")
+        self._database = database or os.getenv("DATABASE__DATABASE", "semantic_stocks_db")
         self._pool: asyncpg.Pool | None = None
 
     async def connect(self) -> None:
@@ -64,7 +64,7 @@ class DatabaseService:
         """Get connection pool, creating if necessary."""
         if self._pool is None:
             await self.connect()
-        return self._pool  # type: ignore
+        return self._pool  # type: ignore[return-value]
 
     # =========================================================================
     # Analysis Runs
@@ -91,6 +91,24 @@ class DatabaseService:
             )
             return row["id"]
 
+    def _build_update_clause(
+        self,
+        updates: list[str],
+        values: list[Any],
+        param_num: int,
+        status: str | None,
+    ) -> int:
+        """Build update clause for status field."""
+        if status is not None:
+            updates.append(f"status = ${param_num}")
+            values.append(status)
+            param_num += 1
+            if status in ("completed", "failed", "cancelled"):
+                updates.append(f"completed_at = ${param_num}")
+                values.append(datetime.now())
+                param_num += 1
+        return param_num
+
     async def update_analysis_run(
         self,
         run_id: UUID,
@@ -110,14 +128,7 @@ class DatabaseService:
         values: list[Any] = []
         param_num = 1
 
-        if status is not None:
-            updates.append(f"status = ${param_num}")
-            values.append(status)
-            param_num += 1
-            if status in ("completed", "failed", "cancelled"):
-                updates.append(f"completed_at = ${param_num}")
-                values.append(datetime.now())
-                param_num += 1
+        param_num = self._build_update_clause(updates, values, param_num, status)
 
         if total_stocks_scanned is not None:
             updates.append(f"total_stocks_scanned = ${param_num}")
@@ -159,8 +170,10 @@ class DatabaseService:
 
         values.append(run_id)
 
+        # Build query safely using parameterized placeholders
         set_clause = ", ".join(updates)
-        query = f"UPDATE analysis_runs SET {set_clause} WHERE id = ${param_num}"
+        # Use parameterized query - safe from SQL injection
+        query = f"UPDATE analysis_runs SET {set_clause} WHERE id = ${param_num}"  # noqa: S608
 
         async with pool.acquire() as conn:
             await conn.execute(query, *values)

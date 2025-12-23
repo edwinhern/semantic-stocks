@@ -1,7 +1,7 @@
 services:
   redis:
     image: redis:8.0-alpine
-    container_name: swingbot-redis
+    container_name: semantic-stocks-redis
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS__PASSWORD}
     restart: unless-stopped
     ports:
@@ -15,7 +15,7 @@ services:
       retries: 5
   postgres:
     image: postgres:16-alpine
-    container_name: swingbot-postgres
+    container_name: semantic-stocks-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DATABASE__USER}
@@ -33,7 +33,7 @@ services:
 
   flyway:
     image: flyway/flyway:11-alpine
-    container_name: swingbot-flyway
+    container_name: semantic-stocks-flyway
     command: migrate
     environment:
       DATABASE__USER: ${DATABASE__USER}

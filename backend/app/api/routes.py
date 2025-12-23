@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.data.sp500 import get_sp500_companies
-from app.services.polygon.screening import analyze_stock
+from app.services.polygon.screening import TechnicalAnalysis, analyze_stock
 from app.services.research.gates import GateConfig, check_discovery_gate
 from app.services.research.pipeline import ResearchPipeline
 
@@ -100,7 +100,7 @@ async def health_check() -> dict:
     return {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "service": "swingbot-api",
+        "service": "semantic-stocks-api",
     }
 
 
@@ -253,6 +253,86 @@ async def run_technical_screening(
 # =============================================================================
 
 
+def _lookup_company_name(ticker: str) -> str:
+    """Look up company name from S&P 500 list."""
+    companies = get_sp500_companies()
+    for c in companies:
+        if c.ticker == ticker:
+            return c.company_name
+    return ticker  # Fallback to ticker
+
+
+def _check_gates(
+    analysis: TechnicalAnalysis,
+    config: GateConfig,
+    gates_passed: list[str],
+    gates_failed: list[str],
+) -> None:
+    """Check discovery and technical gates."""
+    discovery_gate = check_discovery_gate(
+        percent_from_low=analysis.percent_from_low,
+        config=config,
+    )
+    if discovery_gate.passed:
+        gates_passed.append("discovery")
+    else:
+        gates_failed.append(f"discovery: {discovery_gate.reason}")
+
+    if analysis.passes_gate:
+        gates_passed.append("technical")
+    else:
+        gates_failed.append(f"technical: score {analysis.technical_score} < 50")
+
+
+async def _run_perplexity_stages(
+    pipeline: ResearchPipeline,
+    ticker: str,
+    company_name: str,
+    analysis: TechnicalAnalysis,
+    stages_completed: list[str],
+    gates_passed: list[str],
+    gates_failed: list[str],
+    response: SingleStockResponse,
+) -> SingleStockResponse:
+    """Run Perplexity pipeline stages (quick scan, deep research, final scoring)."""
+    # Stage 2: Quick Scan
+    try:
+        quick_scan, scan_gate = await pipeline.run_quick_scan(ticker, company_name)
+        stages_completed.append("quick_scan")
+        response.quick_scan = quick_scan.model_dump()
+
+        if scan_gate.passed:
+            gates_passed.append("quick_scan")
+        else:
+            gates_failed.append(f"quick_scan: {scan_gate.reason}")
+            return response
+
+    except Exception as e:
+        gates_failed.append(f"quick_scan: error - {e!s}")
+        return response
+
+    # Stage 3: Deep Research
+    try:
+        deep_research = await pipeline.run_deep_research(ticker, company_name, analysis)
+        stages_completed.append("deep_research")
+        response.deep_research = deep_research.model_dump()
+
+    except Exception as e:
+        gates_failed.append(f"deep_research: error - {e!s}")
+        return response
+
+    # Stage 4: Final Scoring
+    try:
+        recommendation = await pipeline.run_final_scoring(ticker, company_name, analysis, deep_research)
+        stages_completed.append("final_scoring")
+        response.recommendation = recommendation.model_dump()
+
+    except Exception as e:
+        gates_failed.append(f"final_scoring: error - {e!s}")
+
+    return response
+
+
 @router.post("/analyze/single", response_model=SingleStockResponse)
 async def analyze_single_stock(
     request: SingleStockRequest,
@@ -265,15 +345,7 @@ async def analyze_single_stock(
     ticker = request.ticker.upper()
 
     # Look up company name if not provided
-    company_name = request.company_name
-    if not company_name:
-        companies = get_sp500_companies()
-        for c in companies:
-            if c.ticker == ticker:
-                company_name = c.company_name
-                break
-        if not company_name:
-            company_name = ticker  # Fallback to ticker
+    company_name = request.company_name or _lookup_company_name(ticker)
 
     stages_completed: list[str] = []
     gates_passed: list[str] = []
@@ -292,21 +364,7 @@ async def analyze_single_stock(
     stages_completed.append("technical_analysis")
     technical_dict = analysis.model_dump()
 
-    # Check discovery gate
-    discovery_gate = check_discovery_gate(
-        percent_from_low=analysis.percent_from_low,
-        config=config,
-    )
-    if discovery_gate.passed:
-        gates_passed.append("discovery")
-    else:
-        gates_failed.append(f"discovery: {discovery_gate.reason}")
-
-    # Check technical gate
-    if analysis.passes_gate:
-        gates_passed.append("technical")
-    else:
-        gates_failed.append(f"technical: score {analysis.technical_score} < 50")
+    _check_gates(analysis, config, gates_passed, gates_failed)
 
     response = SingleStockResponse(
         ticker=ticker,
@@ -320,41 +378,9 @@ async def analyze_single_stock(
     # If full pipeline requested and gates passed, run Perplexity stages
     if request.run_full_pipeline and len(gates_failed) == 0:
         pipeline = ResearchPipeline(gate_config=config)
-
-        # Stage 2: Quick Scan
-        try:
-            quick_scan, scan_gate = await pipeline.run_quick_scan(ticker, company_name)
-            stages_completed.append("quick_scan")
-            response.quick_scan = quick_scan.model_dump()
-
-            if scan_gate.passed:
-                gates_passed.append("quick_scan")
-            else:
-                gates_failed.append(f"quick_scan: {scan_gate.reason}")
-                return response
-
-        except Exception as e:
-            gates_failed.append(f"quick_scan: error - {e!s}")
-            return response
-
-        # Stage 3: Deep Research
-        try:
-            deep_research = await pipeline.run_deep_research(ticker, company_name, analysis)
-            stages_completed.append("deep_research")
-            response.deep_research = deep_research.model_dump()
-
-        except Exception as e:
-            gates_failed.append(f"deep_research: error - {e!s}")
-            return response
-
-        # Stage 4: Final Scoring
-        try:
-            recommendation = await pipeline.run_final_scoring(ticker, company_name, analysis, deep_research)
-            stages_completed.append("final_scoring")
-            response.recommendation = recommendation.model_dump()
-
-        except Exception as e:
-            gates_failed.append(f"final_scoring: error - {e!s}")
+        response = await _run_perplexity_stages(
+            pipeline, ticker, company_name, analysis, stages_completed, gates_passed, gates_failed, response
+        )
 
     return response
 

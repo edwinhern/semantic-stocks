@@ -1,1 +1,1 @@
-# swingbot
+# Semantic Stocks
