@@ -158,11 +158,9 @@ class DatabaseService:
             return
 
         values.append(run_id)
-        query = f"""
-            UPDATE analysis_runs
-            SET {", ".join(updates)}
-            WHERE id = ${param_num}
-        """
+
+        set_clause = ", ".join(updates)
+        query = f"UPDATE analysis_runs SET {set_clause} WHERE id = ${param_num}"
 
         async with pool.acquire() as conn:
             await conn.execute(query, *values)
@@ -310,7 +308,7 @@ class DatabaseService:
             query += f" AND recommendation = ANY(${len(params) + 1})"
             params.append(recommendation_filter)
 
-        query += f"""
+        query += """
             ORDER BY ticker, analyzed_at DESC
         """
 

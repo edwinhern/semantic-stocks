@@ -2,15 +2,13 @@
 
 import asyncio
 from datetime import datetime
-from typing import Literal
-from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.data.sp500 import SP500Company, get_sp500_companies
-from app.services.polygon.screening import TechnicalAnalysis, analyze_stock
-from app.services.research.gates import GateConfig, check_discovery_gate, check_technical_gate
+from app.data.sp500 import get_sp500_companies
+from app.services.polygon.screening import analyze_stock
+from app.services.research.gates import GateConfig, check_discovery_gate
 from app.services.research.pipeline import ResearchPipeline
 
 router = APIRouter(prefix="/api", tags=["research"])

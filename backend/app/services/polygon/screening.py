@@ -1,6 +1,6 @@
 """Technical screening and scoring logic for stock analysis."""
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
@@ -14,7 +14,7 @@ from .indicators import (
 )
 
 if TYPE_CHECKING:
-    from massive.rest.aggs import Agg
+    pass
 
 
 class TechnicalData(BaseModel):

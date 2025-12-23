@@ -12,28 +12,27 @@ Usage:
 
 import argparse
 import asyncio
-import sys
 import time
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import AsyncGenerator
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-# Load environment variables
-env_path = Path(__file__).parent.parent / ".env"
-if not env_path.exists():
-    env_path = Path(__file__).parent.parent.parent / ".env"
-load_dotenv(env_path)
 
 from app.api.routes import router as api_router
 from app.data.sp500 import get_sp500_companies
 from app.services.polygon.screening import analyze_stock
 from app.services.research.gates import GateConfig, check_discovery_gate
 from app.services.research.pipeline import ResearchPipeline
+
+# Load environment variables
+env_path = Path(__file__).parent.parent / ".env"
+if not env_path.exists():
+    env_path = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(env_path)
 
 
 # =============================================================================
@@ -246,7 +245,7 @@ async def analyze_single(ticker: str, full_pipeline: bool = False) -> None:
 def run_scan(limit: int, sector: str | None, min_score: int) -> None:
     """Scan S&P 500 for opportunities."""
     print(f"\n{'#' * 60}")
-    print(f"#  S&P 500 TECHNICAL SCAN")
+    print("#  S&P 500 TECHNICAL SCAN")
     print(f"#  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'#' * 60}")
 

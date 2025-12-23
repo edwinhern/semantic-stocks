@@ -4,9 +4,8 @@ import json
 import os
 from typing import Any, Literal, TypeVar
 
-from pydantic import BaseModel
-
 from perplexity import AsyncPerplexity, Perplexity
+from pydantic import BaseModel
 
 # Type-safe model selection
 PerplexityModel = Literal[

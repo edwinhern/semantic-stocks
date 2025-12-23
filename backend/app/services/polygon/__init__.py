@@ -6,11 +6,10 @@ from .screening import TechnicalAnalysis, TechnicalData, compute_technical_score
 
 __all__ = [
     "PolygonClient",
-    "get_polygon_client",
+    "TechnicalAnalysis",
+    "TechnicalData",
     "calculate_rsi",
     "calculate_sma",
-    "TechnicalData",
-    "TechnicalAnalysis",
     "compute_technical_score",
+    "get_polygon_client",
 ]
-

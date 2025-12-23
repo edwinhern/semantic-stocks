@@ -4,7 +4,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 # =============================================================================
 # Stage 0: Discovery - Stock candidates near 52-week lows
 # =============================================================================

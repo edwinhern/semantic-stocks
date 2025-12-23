@@ -6,10 +6,8 @@ Implements the "Polygon First, Perplexity Smart" strategy:
 3. Only spend on Perplexity for pre-qualified stocks
 """
 
-import json
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
 
 from ..perplexity import PerplexityClient, get_perplexity_client
 from ..perplexity.models import DeepResearchResult, FinalRecommendation, PipelineResult, QuickSentimentScan

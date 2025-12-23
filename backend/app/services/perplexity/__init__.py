@@ -10,12 +10,12 @@ from .models import (
 from .prompts import PromptTemplates
 
 __all__ = [
-    "PerplexityClient",
-    "PerplexityModel",
-    "get_perplexity_client",
-    "StockCandidate",
-    "QuickSentimentScan",
     "DeepResearchResult",
     "FinalRecommendation",
+    "PerplexityClient",
+    "PerplexityModel",
     "PromptTemplates",
+    "QuickSentimentScan",
+    "StockCandidate",
+    "get_perplexity_client",
 ]

@@ -91,15 +91,14 @@ def check_discovery_gate(
         )
 
     # Check market cap if configured
-    if config.min_market_cap is not None and market_cap is not None:
-        if market_cap < config.min_market_cap:
-            return GateResult(
-                passed=False,
-                gate_name="discovery",
-                reason=f"Market cap too small (${market_cap:,.0f} < ${config.min_market_cap:,.0f})",
-                score=market_cap,
-                threshold=config.min_market_cap,
-            )
+    if config.min_market_cap is not None and market_cap is not None and market_cap < config.min_market_cap:
+        return GateResult(
+            passed=False,
+            gate_name="discovery",
+            reason=f"Market cap too small (${market_cap:,.0f} < ${config.min_market_cap:,.0f})",
+            score=market_cap,
+            threshold=config.min_market_cap,
+        )
 
     # Check sector filters
     if sector:

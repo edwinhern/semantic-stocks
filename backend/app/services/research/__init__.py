@@ -6,10 +6,10 @@ from .pipeline import ResearchPipeline, run_full_pipeline, run_single_stock_anal
 __all__ = [
     "GateConfig",
     "GateResult",
-    "check_discovery_gate",
-    "check_technical_gate",
-    "check_quick_scan_gate",
     "ResearchPipeline",
+    "check_discovery_gate",
+    "check_quick_scan_gate",
+    "check_technical_gate",
     "run_full_pipeline",
     "run_single_stock_analysis",
 ]

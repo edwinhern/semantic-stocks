@@ -10,13 +10,13 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-env_path = Path(__file__).parent.parent.parent / ".env"
-load_dotenv(env_path)
-
 from app.data.sp500 import get_sp500_companies
 from app.services.polygon.screening import analyze_stock
 from app.services.research.gates import GateConfig, check_discovery_gate
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(env_path)
 
 
 def test_sp500_data() -> None:
@@ -90,7 +90,7 @@ def test_technical_screening(limit: int = 20) -> None:
 
             if analysis is None:
                 failed_data.append(ticker)
-                print(f"  ✗ Insufficient data")
+                print("  ✗ Insufficient data")
                 continue
 
             # Check discovery gate (52-week low proximity)
@@ -183,6 +183,7 @@ def main() -> None:
 
     print("\n" + "#" * 70)
     print("#  TEST COMPLETE")
+    print("passed", passed)
     print("#" * 70)
 
 
