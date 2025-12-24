@@ -103,21 +103,20 @@ def _dataframe_to_companies(df: "pd.DataFrame") -> list[SP500Company]:  # type: 
     """Convert DataFrame to list of SP500Company objects."""
     companies: list[SP500Company] = []
 
-    # Use itertuples() instead of iterrows() for better performance
-    for row in df.itertuples(index=False):
-        ticker = str(getattr(row, "Symbol", "")).strip()
+    for _, row in df.iterrows():
+        ticker = str(row.get("Symbol", "")).strip()
         if not ticker or ticker == "nan":  # Skip empty rows
             continue
 
         company = SP500Company(
             ticker=ticker,
-            company_name=str(getattr(row, "Security", "")).strip(),
-            sector=str(getattr(row, "GICS Sector", "")).strip(),
-            sub_industry=str(getattr(row, "GICS Sub-Industry", "")).strip(),
-            headquarters=str(getattr(row, "Headquarters Location", "")).strip(),
-            date_added=_clean_field(getattr(row, "Date added", None)),
-            cik=_clean_field(getattr(row, "CIK", None)),
-            founded=_clean_field(getattr(row, "Founded", None)),
+            company_name=str(row.get("Security", "")).strip(),
+            sector=str(row.get("GICS Sector", "")).strip(),
+            sub_industry=str(row.get("GICS Sub-Industry", "")).strip(),
+            headquarters=str(row.get("Headquarters Location", "")).strip(),
+            date_added=_clean_field(row.get("Date added", None)),
+            cik=_clean_field(row.get("CIK", None)),
+            founded=_clean_field(row.get("Founded", None)),
         )
         companies.append(company)
 
