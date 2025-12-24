@@ -27,3 +27,9 @@ lint: ## Lint code
 
 typecheck: ## Type check code
 	uv run --group dev python -m mypy app
+
+docker-build: ## Build Docker image
+	docker build -t semantic-stocks-api -f docker/Dockerfile .
+
+docker-run: ## Run Docker container
+	docker run -d --name semantic-stocks-api semantic-stocks-api
