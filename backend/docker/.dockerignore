@@ -87,3 +87,13 @@ venv/
 
 # VS Code
 .vscode/
+
+# Documentation and build files
+README.md
+makefile
+*.md
+
+# Test files
+*test*.py
+test_*.py
+*_test.py

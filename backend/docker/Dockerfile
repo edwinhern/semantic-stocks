@@ -21,8 +21,9 @@ COPY --from=builder /app/.venv /app/.venv
 WORKDIR /app
 COPY app/ ./app/
 
-# Ensure the virtual environment is in PATH
-ENV PATH="/app/.venv/bin:$PATH"
+# Ensure the virtual environment is in PATH and Python can find the app package
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="/app"
 
 # Run the application.
-CMD ["fastapi", "run", "app/main.py", "--port", "80"]
+CMD ["fastapi", "run", "app/main.py", "--port", "8080", "--host", "0.0.0.0"]
